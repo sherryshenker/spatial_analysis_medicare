@@ -52,7 +52,9 @@ q2 <- nb2listw(q1,zero.policy=TRUE )
 #' - weights: a neighborweight list object
 #' - var: variable of interest as a string
 #' - alpha: significance cut-off, as a float < 1
-plot_local_moran <- function(weights,var,alpha){
+#' Optional:
+#' - correct: a boolean, if TRUE, apply bonferroni correction
+plot_local_moran <- function(weights,var,alpha,correct=FALSE){
   lmoran <- localmoran(costs[[var]], weights, zero.policy=NULL, na.action=na.fail,
              alternative = "greater", p.adjust.method="none", mlvar=TRUE,
              spChk=NULL, sokal98=FALSE)
@@ -65,7 +67,11 @@ plot_local_moran <- function(weights,var,alpha){
   #define significance intervals
   midwest_spatial$quad_sig <- NA
   
-  # high-high quadrant
+  # bonferroni correction
+  if (correct){
+    lmoran[, 5] <- p.adjust(lmoran[, 5],"bonferroni")
+  }
+  
   midwest_spatial[(midwest_spatial$scost >= 0 & 
                   midwest_spatial$lag_scost >= 0) & 
                  (lmoran[, 5] <= alpha), "quad_sig"] <- "high-high"
@@ -100,56 +106,28 @@ plot_local_moran <- function(weights,var,alpha){
   
   return(list("plot"=plot,"moran"=lmoran,"data"=pdata)) }
 
+# Define 7NN Weights matrix
 IDs <- row.names(as(midwest_spatial, "data.frame"))
-
 knn2 <- nb2listw(knn2nb(knearneigh(points, k = 7),row.names=IDs))
+
 kn7_rate <- plot_local_moran(knn2)
-ggsave("images/rook_local_moran.png",rook_plot )
 
-lmoran_rook <- localmoran(costs[["cost"]], nbls2, zero.policy=NULL, na.action=na.fail,
-                          alternative = "greater", p.adjust.method="none", mlvar=TRUE,
-                          spChk=NULL, sokal98=FALSE)
-lmoran_rook_rate <- localmoran(costs[["rate"]], nbls2, zero.policy=NULL, na.action=na.fail,
-                               alternative = "greater", p.adjust.method="none", mlvar=TRUE,
-                               spChk=NULL, sokal98=FALSE)
 
-cost_queen_p10 <- plot_local_moran(q2,"cost",0.1)
+# lmoran_rook <- localmoran(costs[["cost"]], nbls2, zero.policy=NULL, na.action=na.fail,
+#                         alternative = "greater", p.adjust.method="none", mlvar=TRUE,
+#                          spChk=NULL, sokal98=FALSE)
+# lmoran_rook_rate <- localmoran(costs[["rate"]], nbls2, zero.policy=NULL, na.action=na.fail,
+#                               alternative = "greater", p.adjust.method="none", mlvar=TRUE,
+#                               spChk=NULL, sokal98=FALSE)
+
+cost_queen_p10 <- plot_local_moran(q2,"cost",0.05)
+
+cost_queen_bonf <- plot_local_moran(q2,"cost",0.05,correct = TRUE)
+
+cost_rate_bonf <- plot_local_moran(q2,"rate",0.05,correct = TRUE)
 
 ggsave("../images/cost_queen_localmoran_p10.png",cost_queen_p10)
 
 cost_queen_p001 <- plot_local_moran(q2,"cost",0.01)
 
 ggsave("../images/cost_queen_localmoran_p01.png",cost_queen_p001)
-
-p <- coordinates(midwest_spatial)
-p1 <- as.data.frame(p)
-fit1 <- lisa.nc(x=p1$V1, y=p1$V2, z=costs[,c("cost","rate")], neigh=3)
-fit1$id <- seq(from=0,to=1053,by=1)
-length(fit1$p)
-
-lisa <- cbind(fit1$id,fit1$p,fit1$correlation)
-lisa <- as.data.frame(lisa)
-names(lisa) <- c("id","p","corr")
-
-midwest_spatial@data$bivar_p <- lisa$p
-midwest_spatial@data$corr <- lisa$corr
-
-#midwest_df2 <- left_join(midwest_df,lisa,by="id")
-midwest_spatial@data$sig[midwest_spatial@data$bivar_p<0.05] <- 1
-midwest_spatial@data$sig[midwest_spatial@data$bivar_p>=0.05] <- 0
-
-midwest_spatial@data$sig[(midwest_spatial@data$bivar_p<0.05) 
-                         & (midwest_spatial@data$corr > 0)] <- "high-high"
-
-midwest_spatial@data$sig[(midwest_spatial@data$bivar_p<0.05) 
-                         & (midwest_spatial@data$corr > 0)] <- "high-high"
-
-
-
-midwest_spatial@data$id <- seq(from=0,to=1053,by=1)
-pdata <- fortify(midwest_spatial,region="id")
-pdata2 <- merge(pdata,midwest_spatial@data,by="id")
-lisa_plot <- (ggplot(pdata2) 
-              + geom_polygon(aes(x=long,y=lat,group=group,
-                                 fill=as.factor(pdata2$sig)))
-              + title("Bivariate Local Spatial Autocorrelation"))
