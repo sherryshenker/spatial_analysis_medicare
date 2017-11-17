@@ -131,3 +131,19 @@ ggsave("../images/cost_queen_localmoran_p10.png",cost_queen_p10)
 cost_queen_p001 <- plot_local_moran(q2,"cost",0.01)
 
 ggsave("../images/cost_queen_localmoran_p01.png",cost_queen_p001)
+
+# ------- Local G --------------
+localGvalues <- localG(x = costs$cost, listw = knn2, zero.policy = TRUE)
+
+midwest_spatial@data$localg <- localGvalues
+midwest_spatial@data$localg_sig <- "Not Significant"
+midwest_spatial@data$localg_sig[which(midwest_spatial@data$localg>1.96)] <- "High"
+midwest_spatial@data$localg_sig[which(midwest_spatial@data$localg< (-1.96))] <- "Low"
+plot_data <- fortify(midwest_spatial, region="id")
+pdata <- merge(plot_data,midwest_spatial@data,by="id")
+
+map_plot <- (ggplot(pdata)
+             + geom_polygon(aes(x=long,y=lat,group=group,fill=localg_sig))
+             + ggtitle("Per Capita Cost - Local Getis-Ord")
+             + scale_fill_manual(name="Cluster Type",values=c("red","blue","grey")))
+getisplot <- format_plot(map_plot) 

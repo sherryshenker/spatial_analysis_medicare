@@ -29,7 +29,7 @@ sdat_raw <- scale(pca.train[,-1])
 #' @img_name string, for saving the image
 #' 
 #' @return plot, ggplot object
-skater_cluster(data,nb,k,spatial_data,img_name){
+skater_cluster<- function(data,nb,k,spatial_data,img_name){
   #prep inputs
   data <- scale(data)
   lcosts <- nbcosts(nb,data)
@@ -44,7 +44,7 @@ skater_cluster(data,nb,k,spatial_data,img_name){
   spatial_data@data$cluster <- ccs4
   spatial_data@data$id <- seq(from=1,to=nrow(spatial_data@data),by=1)
   plt <- fortify(spatial_data,id="id")
-  plt <- merge(plt,il@data,by.x="id",by.y=0)
+  plt <- merge(plt,plt@data,by.x="id",by.y=0)
   
   skater_q <- (ggplot(plt) 
                + geom_polygon(aes(x=long,y=lat,
@@ -57,25 +57,3 @@ skater_cluster(data,nb,k,spatial_data,img_name){
   skater_q <- format_plot(skater_q)
   ggsave(img_name,skater_q)
 }
-
-nb <- poly2nb(midwest_spatial[which(midwest_spatial$STATEFP=="17"),])
-
-
-il <- midwest_spatial[which(midwest_spatial$STATEFP=="17"),]
-
-
-clus4 <- skater(medicare.mst[,1:2],sdat,7)
-ccs4 <- clus4$groups
-
-il <- midwest_spatial[which(midwest_spatial$STATEFP=="17"),]
-il@data$cluster <- ccs4
-il_plt <- fortify(il,id="GEOID")
-il_plt <- merge(il_plt,il@data,by.x="id",by.y=0)
-
-skater_q6 <- (ggplot(il_plt) 
-             + geom_polygon(aes(x=long,y=lat,
-                                group=group,fill=as.factor(il_plt$cluster)))
-             +  scale_fill_brewer(name="Cluster",palette="Accent")
-             + ggtitle("SKATER Clustering (k=8)"))
-skater_q6 <- format_plot(skater_q6)
-ggsave("skater_q_8.png",skater_q6)

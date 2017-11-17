@@ -25,11 +25,21 @@ abline(h = 0, v = 0, lty = 2, col = 8)
 summary(pca$x)
 
 pcs1 <- as.data.frame(pca$x)
-pcs1$AREA_ID <- as.integer(pca.train$code_combo)
+pcs1$code_combo <- as.integer(pca.train$code_combo)
+
+p2 <- left_join(pcs1,subset[,c("code_combo","state_fips")],by="code_combo")
+
 names(pcs1)
 
 scores <- ggplot(pcs1,aes(x=PC1,y=PC2)) + geom_point() + ggtitle("PCA Scores") + theme_bw()
-ggsave("images/pca_scores.png",scores)
+scores <- (ggplot(p2,aes(x=PC1,y=PC2))
+           + geom_point(aes(color=as.factor(p2$state_fips)))
+           + ggtitle("PCA Scores") + 
+             theme_bw()
+           + scale_color_discrete(name="STATE",guide=FALSE)
+           )
+setwd("~/spatial_analysis_medicare")
+ggsave("images/pca_scores_color.png",scores)
 
 scaled_data <- scale(pca.train[,-1])
 vv <- cor(scaled_data,pca$x)
@@ -40,7 +50,7 @@ pca1_corr$var <- rownames(pca1_corr)
 
 sorted <- pca1_corr %>% arrange(-corr)
 
-top15 <- sorted[c(1:15),]
+top15 <- sorted[c(1:10),]
 
 bar_chart <- (ggplot(top15) 
               + geom_col(aes(x=reorder(var, -corr),y=corr,fill=var)) 
@@ -49,9 +59,13 @@ bar_chart <- (ggplot(top15)
               + labs(x="Data column",y="Correlation")
               + guides(fill=FALSE)
               +theme_bw()+
-                theme(axis.text.x = element_text(angle = 90, hjust = 1),
+                coord_fixed(ratio=.3) + 
+                coord_flip() + 
+                
+                theme(text = element_text(size=16),
+                      axis.text.x = element_text(angle = 90, hjust = 1),
                       panel.grid.major = element_blank(), 
                       panel.grid.minor = element_blank()) +
                 scale_fill_viridis(option="magma",discrete=TRUE))
 
-ggsave("images/pca_bar_chart.png",bar_chart)
+ggsave("pca_bar_chart.png",bar_chart)
