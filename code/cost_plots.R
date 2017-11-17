@@ -133,8 +133,41 @@ correlation_dist <- (ggplot(as.data.frame(sub))
                      + theme_bw()
                      + labs(x="Correlation w. Cost",y="Number of Variables")
                      + theme(strip.text.x = element_text(size = 14),
-                             text = element_text(size=16),
-                             legend.text=element_text(size=16))
+                             text = element_text(size = 16),
+                             legend.text = element_text(size = 16))
                      + ggtitle("Distribution of Correlations w. Medicare Costs"))
                      
 ggsave("correlation_hist.png",correlation_dist)
+
+# ------- demographics
+
+mean <- mean(midwest_df$age[which(!is.na(midwest_df$age))])
+
+age <- (ggplot(midwest_df) 
+                     + geom_polygon(aes(x = long, y = lat, 
+                                        group = group, fill = age), 
+                                         color="black")
+                     + coord_fixed()
+                     + scale_fill_gradient2("Average Age", 
+                                            low = "blue", high = "red", midpoint = mean)
+                     + ggtitle("Average Age by County"))
+
+setwd("~/spatial_analysis_medicare/images")
+
+p2 <- format_plot(age)
+ggsave("age_midwest.png",p2)
+
+mean <- mean(midwest_df$Average.HCC.Score[which(!is.na(midwest_df$Average.HCC.Score))])
+
+hcc <- (ggplot(midwest_df) 
+        + geom_polygon(aes(x = long,y=lat,group=
+                             group,fill=Average.HCC.Score), color="black")
+        + coord_fixed()
+        + scale_fill_gradient2("Average HCC Score", 
+                               low = "blue", high = "red", midpoint = mean)
+        + ggtitle("Average HCC Score by County"))
+
+setwd("~/spatial_analysis_medicare/images")
+
+p2 <- format_plot(hcc)
+ggsave("age_midwest.png",p2)

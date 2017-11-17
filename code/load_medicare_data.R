@@ -72,5 +72,5 @@ midwest_df <- continent[which(continent$STATEFP %in% midwest),]
 
 no_spaces <- make.names(names(midwest_df), unique=TRUE)
 names(midwest_df) <- no_spaces
-midwest_df <- sapply(midwest_df, as.numeric )
+midwest_df <- sapply(midwest_df, function(x) as.numeric(as.character(x)))
 midwest_df <- as.data.frame(midwest_df)
