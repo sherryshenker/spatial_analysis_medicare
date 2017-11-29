@@ -1,3 +1,5 @@
+# base script for loading packages, helper functions, and data for all analysis
+
 library(maps)
 library(maptools)  #for shapefiles
 library(scales)
@@ -34,43 +36,36 @@ colnames(medicare) <- as.matrix(medicare[1,])
 #delete first row 
 medicare <- medicare[-1, ]
 
+#spatial county data
 setwd("~/Desktop/geospatial data/final_project/cb_2016_us_county_500k")
 
 countys <- rgdal::readOGR(dsn = ".",layer="cb_2016_us_county_500k")
 
 countys_f <- fortify(countys,region="GEOID")
 
-medicare$state_fips <- substr(as.character(medicare$`State and County FIPS Code`),
-                              start=1,stop=2)
+#extract state and county codes separately
 
-medicare$county_fips <- substr(as.character(medicare$`State and County FIPS Code`),
-                               start=3,stop=4)
+countys.df <- merge(countys_f,countys@data,by.x="id",by.y="GEOID")
+countys.df$code_combo <- paste0(countys.df$STATEFP,countys.df$COUNTYFP)
+countys.df$code_combo <- as.numeric(countys.df$code_combo)
 
+county_medicare <- merge(countys.df,medicare,by.x="code_combo",by.y="State and County FIPS Code",all.x=TRUE)
 
-countys_sub <- as.data.frame(countys)
-countys_sub$row_id <- rownames(countys_sub)
-countys_sub$code_combo <- paste0(countys_sub$STATEFP,countys_sub$COUNTYFP)
-
-county_medicare <- merge(countys_sub,medicare,by.x="code_combo",by.y="State and County FIPS Code",all.x=TRUE)
-
-countys_df <- merge(fortify(countys), county_medicare,
-                    by.x=c("id"), by.y=c("row_id"))
-
-continent <- countys_df[which(countys_df$STATEFP!="02"&countys_df$STATEFP!="15"),]
-
-#north_east <- c("09","25","23","50","44","42","36","33","34")
-
-
-continent$`Actual Per Capita Costs` <- as.numeric(continent$`Actual Per Capita Costs`)
-continent$`Standardized Per Capita Costs` <- as.numeric(continent$`Standardized Per Capita Costs`)
-
-#north_east_df <- continent[which(continent$STATEFP %in% north_east),]
+# filter for only midwestern states 
 midwest <- c("17","18","19","20","26","27","29","31","38","39","46","55")
 
-midwest_df <- continent[which(continent$STATEFP %in% midwest),]
-#midwest_df$`Standardized Per Capita Costs` <- as.numeric(midwest_df$`Standardized Per Capita Costs`)
+medicare_spatial <- county_medicare[which(county_medicare$STATEFP %in% midwest),]
 
-no_spaces <- make.names(names(midwest_df), unique=TRUE)
-names(midwest_df) <- no_spaces
-midwest_df <- sapply(midwest_df, function(x) as.numeric(as.character(x)))
-midwest_df <- as.data.frame(midwest_df)
+no_spaces <- make.names(names(medicare_spatial), unique=TRUE)
+names(medicare_spatial) <- no_spaces
+
+#convert from factors to numeric 
+midwest_spatial <- sapply(medicare_spatial, function(x) as.numeric(as.character(gsub("%","",x))))
+midwest_spatial <- as.data.frame(midwest_spatial)
+midwest_spatial1 <- subset(midwest_spatial, select = -c(State,County))
+
+#data only without the geographic component 
+midwest_data <- medicare[which(medicare$`State and County FIPS Code` %in% midwest_spatial$code_combo),]
+midwest_data <- sapply(midwest_data, function(x) as.numeric(as.character(gsub("%","",x))))
+midwest_data <- as.data.frame(midwest_data)
+midwest_data <- subset(midwest_data,select=-c(State,County))
