@@ -4,9 +4,6 @@ setwd("~/spatial_analysis_medicare/code")
 
 source("load_medicare_data.R")
 
-library(dismo)
-library(ncf)
-
 contained_codes <-midwest_df$code_combo[which(!is.na(midwest_df$Standardized.Per.Capita.Costs))]
 countys@data$code_combo <-  paste0(countys@data$STATEFP,countys@data$COUNTYFP)
 
@@ -40,10 +37,12 @@ ggsave("correlogram.png",correlogram2)
 
 
 # ----- Local Spatial Autocorrelation -----------
-nb2 <- poly2nb(midwest_spatial, queen=FALSE)
+county_med_spatial <- countys[which(countys@data$code_combo %in% midwest_data$`State and County FIPS Code`),]
+
+nb2 <- poly2nb(county_med_spatial, queen=FALSE)
 nbls2 <- nb2listw(nb2,zero.policy=TRUE )
 
-q1 <- poly2nb(midwest_spatial, queen=TRUE)
+q1 <- poly2nb(county_med_spatial, queen=TRUE)
 q2 <- nb2listw(q1,zero.policy=TRUE )
 
 #' Function for mapping local spatial clusters
@@ -52,85 +51,88 @@ q2 <- nb2listw(q1,zero.policy=TRUE )
 #' - weights: a neighborweight list object
 #' - var: variable of interest as a string
 #' - alpha: significance cut-off, as a float < 1
+#' - title: string
 #' Optional:
 #' - correct: a boolean, if TRUE, apply bonferroni correction
-plot_local_moran <- function(weights,var,alpha,correct=FALSE){
-  lmoran <- localmoran(costs[[var]], weights, zero.policy=NULL, na.action=na.fail,
-             alternative = "greater", p.adjust.method="none", mlvar=TRUE,
+plot_local_moran <- function(weights,var,alpha,title,correct=FALSE){
+  lmoran <- localmoran(midwest_data[[var]], weights, zero.policy=NULL, na.action=na.fail,
+             alternative = "two.sided", p.adjust.method="none", mlvar=TRUE,
              spChk=NULL, sokal98=FALSE)
-  
-  midwest_spatial@data$cost <- costs[[var]]
-  midwest_spatial$scost <- scale(midwest_spatial$cost)
+
+  county_med_spatial@data$var <- midwest_data[[var]]
+  county_med_spatial@data$scost <- scale(county_med_spatial@data$var)
   # create a lagged variable
-  midwest_spatial$lag_scost <- lag.listw(weights, midwest_spatial$scost)
+  county_med_spatial@data$lag_scost <- lag.listw(weights,county_med_spatial@data$scost)
   
   #define significance intervals
-  midwest_spatial$quad_sig <- NA
-  
+  county_med_spatial$quad_sig <- NA
+ 
   # bonferroni correction
   if (correct){
     lmoran[, 5] <- p.adjust(lmoran[, 5],"bonferroni")
   }
+
   
-  midwest_spatial[(midwest_spatial$scost >= 0 & 
-                  midwest_spatial$lag_scost >= 0) & 
+  county_med_spatial@data$sig <- lmoran[,5]
+  
+  county_med_spatial[(county_med_spatial$scost >= 0 & 
+                  county_med_spatial$lag_scost >= 0) & 
                  (lmoran[, 5] <= alpha), "quad_sig"] <- "high-high"
   # low-low quadrant
-  midwest_spatial[(midwest_spatial$scost <= 0 & 
-                  midwest_spatial$lag_scost <= 0) & 
+  county_med_spatial[(county_med_spatial$scost <= 0 & 
+                  county_med_spatial$lag_scost <= 0) & 
                  (lmoran[, 5] <= alpha), "quad_sig"] <- "low-low"
   # high-low quadrant
-  midwest_spatial[(midwest_spatial$scost >= 0 & 
-                  midwest_spatial$lag_scost <= 0) & 
-                 (lmoran[, 5] <= alpha), "quad_sig"] <- "high-low"
+  county_med_spatial[(county_med_spatial$scost >= 0 & 
+                  county_med_spatial$lag_scost <= 0 & 
+                 lmoran[, 5] <= alpha), "quad_sig"] <- "high-low"
   # low-high quadrant
-  midwest_spatial@data[(midwest_spatial$scost <= 0 
-                     & midwest_spatial$lag_scost >= 0) & 
-                      (lmoran[, 5] <= alpha), "quad_sig"] <- "low-high"
+  county_med_spatial@data[(county_med_spatial$scost <= 0 
+                     & county_med_spatial$lag_scost >= 0 & 
+                      lmoran[, 5] <= alpha), "quad_sig"] <- "low-high"
   # non-significant observations
-  midwest_spatial@data[(lmoran[, 5] > alpha), "quad_sig"] <- "not signif."  
+  county_med_spatial@data[(lmoran[, 5] > alpha), "quad_sig"] <- "not signif."  
   
-  midwest_spatial$quad_sig <- as.factor(midwest_spatial$quad_sig)
-  midwest_spatial@data$id <- rownames(midwest_spatial@data)
+  county_med_spatial$quad_sig <- as.factor(county_med_spatial$quad_sig)
+  county_med_spatial@data$id <- rownames(county_med_spatial@data)
   
   # create plot 
   
-  plot_data <- fortify(midwest_spatial, region="id")
-  pdata <- merge(plot_data,midwest_spatial@data,by="id")
+  plot_data <- fortify(county_med_spatial, region="id")
+  pdata <- merge(plot_data,county_med_spatial@data,by="id")
   
   map_plot <- (ggplot(pdata)
-                + geom_polygon(aes(x=long,y=lat,group=group,fill=quad_sig))
-                + ggtitle("Per Capita Cost - Local Moran's I")
-                + scale_fill_manual(name="Cluster Type",values=c("red","blue","grey")))
+                + geom_polygon(aes(x=long,y=lat,group=group,fill=quad_sig),color="black")
+                + ggtitle(title)
+                + scale_fill_manual(name="Cluster Type",values=c("red","pink","blue","lightblue","grey")))
   plot <- format_plot(map_plot) 
   
   return(list("plot"=plot,"moran"=lmoran,"data"=pdata)) }
 
 # Define 7NN Weights matrix
-IDs <- row.names(as(midwest_spatial, "data.frame"))
-knn2 <- nb2listw(knn2nb(knearneigh(points, k = 7),row.names=IDs))
-
-kn7_rate <- plot_local_moran(knn2)
+IDs <- row.names(as(county_med_spatial, "data.frame"))
+knn2 <- nb2listw(knn2nb(knearneigh(coordinates(county_med_spatial), k = 7),row.names=IDs))
 
 
-# lmoran_rook <- localmoran(costs[["cost"]], nbls2, zero.policy=NULL, na.action=na.fail,
-#                         alternative = "greater", p.adjust.method="none", mlvar=TRUE,
-#                          spChk=NULL, sokal98=FALSE)
-# lmoran_rook_rate <- localmoran(costs[["rate"]], nbls2, zero.policy=NULL, na.action=na.fail,
-#                               alternative = "greater", p.adjust.method="none", mlvar=TRUE,
-#                               spChk=NULL, sokal98=FALSE)
+cost_kn7_p10 <- plot_local_moran(knn2,"Actual Per Capita Costs",0.05,"Per Capita Costs - Local Moran's I")
+ggsave("final/kn7_p05_cost.png",cost_kn7_p10$plot)
 
-cost_queen_p10 <- plot_local_moran(q2,"cost",0.05)
+pca_kn7_p10 <- plot_local_moran(knn2,"PC1",0.05,"First PCA Component - Local Moran's I")
+ggsave("final/kn7_p05_pca.png",pca_kn7_p10$plot)
 
-cost_queen_bonf <- plot_local_moran(q2,"cost",0.05,correct = TRUE)
+cost_queen_p10 <- plot_local_moran(q2,"Actual Per Capita Costs",0.05,"Actual Per Capita Costs - Local Moran's I (Queen)")
+cost_queen <- cost_queen_p10$plot
+ggsave("final/moran_queen_cost_0.05.png",cost_queen)
 
-cost_rate_bonf <- plot_local_moran(q2,"rate",0.05,correct = TRUE)
 
-ggsave("../images/cost_queen_localmoran_p10.png",cost_queen_p10)
+cost_queen_bonf <- plot_local_moran(q2,"Actual Per Capita Costs",0.05,"Actual Per Capita Costs (Bonferroni Corection)",correct = TRUE)
+cost_b <- cost_queen_bonf$plot
+ggsave("final/moran_bonf_cost.png",cost_b)
 
-cost_queen_p001 <- plot_local_moran(q2,"cost",0.01)
+pca_queen_p05 <- plot_local_moran(q2,"PC1",0.05)
+pca_queen <- pca_queen_p05$plot
+ggsave("final/pca_queen.png",pca_queen)
 
-ggsave("../images/cost_queen_localmoran_p01.png",cost_queen_p001)
 
 # ------- Local G --------------
 localGvalues <- localG(x = costs$cost, listw = knn2, zero.policy = TRUE)
@@ -147,3 +149,9 @@ map_plot <- (ggplot(pdata)
              + ggtitle("Per Capita Cost - Local Getis-Ord")
              + scale_fill_manual(name="Cluster Type",values=c("red","blue","grey")))
 getisplot <- format_plot(map_plot) 
+
+
+# ------- global autocorrelation -------------
+
+moran.test(costs$cost,knn2,zero.policy = TRUE,alternative = "two.sided",randomisation = FALSE)
+

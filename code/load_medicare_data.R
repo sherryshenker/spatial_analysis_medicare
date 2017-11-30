@@ -9,6 +9,8 @@ library(ggplot2)
 library(sp)
 library(viridis)
 library(spdep)
+library(dismo)
+library(ncf)
 
 format_plot <- function(p){
   final <- (p + theme_bw() + theme(strip.text.x = element_text(size = 14),
@@ -48,7 +50,8 @@ countys_f <- fortify(countys,region="GEOID")
 countys.df <- merge(countys_f,countys@data,by.x="id",by.y="GEOID")
 countys.df$code_combo <- paste0(countys.df$STATEFP,countys.df$COUNTYFP)
 countys.df$code_combo <- as.numeric(countys.df$code_combo)
-
+countys@data$code_combo <- paste0(countys@data$STATEFP,countys@data$COUNTYFP)
+countys@data$code_combo <- as.numeric(countys@data$code_combo)
 county_medicare <- merge(countys.df,medicare,by.x="code_combo",by.y="State and County FIPS Code",all.x=TRUE)
 
 # filter for only midwestern states 
@@ -56,6 +59,7 @@ midwest <- c("17","18","19","20","26","27","29","31","38","39","46","55")
 
 medicare_spatial <- county_medicare[which(county_medicare$STATEFP %in% midwest),]
 
+county_spatial <- countys.df[which(countys.df$STATEFP %in% midwest),]
 no_spaces <- make.names(names(medicare_spatial), unique=TRUE)
 names(medicare_spatial) <- no_spaces
 
@@ -69,3 +73,6 @@ midwest_data <- medicare[which(medicare$`State and County FIPS Code` %in% midwes
 midwest_data <- sapply(midwest_data, function(x) as.numeric(as.character(gsub("%","",x))))
 midwest_data <- as.data.frame(midwest_data)
 midwest_data <- subset(midwest_data,select=-c(State,County))
+midwest_data <- midwest_data %>% arrange(`State and County FIPS Code`)
+
+#county_med_spatial@data <- county_med_spatial@data %>% arrange(code_combo)
