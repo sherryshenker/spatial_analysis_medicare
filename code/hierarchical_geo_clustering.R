@@ -17,9 +17,13 @@ geodata <- countys[which(countys@data$code_combo %in% pca.train$code_combo),]
 featw <- dist(sdat_raw)
 geow <- D1
 
-t1 <- hclustgeo_med(geodata,featw,geow,0.2,5,"hclustgeo_0.2_5.png")
-t2 <- hclustgeo_med(geodata,featw,geow,0.7,5,"hclustgeo_0.7_5.png")
-t3 <- hclustgeo_med(geodata,featw,geow,0.1,5,"hclustgeo_0.1_5.png")
+t1 <- hclustgeo_med(geodata,featw,geow,0.2,5,"hclustgeo_02_5.png")
+t2 <- hclustgeo_med(geodata,featw,geow,0.7,5,"hclustgeo_07_5.png")
+t3 <- hclustgeo_med(geodata,featw,geow,0.1,5,"hclustgeo_01_5.png")
+
+t1 <- hclustgeo_med(geodata,featw,geow,0.2,4,"hclustgeo_02_4.png")
+t2 <- hclustgeo_med(geodata,featw,geow,0.7,4,"hclustgeo_07_4.png")
+t3 <- hclustgeo_med(geodata,featw,geow,0.1,4,"hclustgeo_01_4.png")
 
 #' Compute hierarchical clustering with spatial constraints
 #' @param geodata Spatial Polygons obj

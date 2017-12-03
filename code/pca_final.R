@@ -26,12 +26,17 @@ keep <- c(keep,"State and County FIPS Code")
 pca.train <- midwest_data[,which(names(midwest_data) %in% keep)]
 
 pca <- prcomp(pca.train[,c(2:83)], scale. = T)
-screeplot(pca, type="lines",col=3)
+screeplot(pca, type = "lines", col = "blue",
+          main = "Scree plot for PCA",
+          xlab = "Principal Component Number",
+          )
 
 pcld <- as.data.frame(pca$rotation)
 pcld$abs_pc1 <- abs(pcld$PC1)
+pcld$abs_pc2 <- abs(pcld$PC2)
 pcld$col <- rownames(pcld)
 ordered <- pcld %>% arrange(-abs_pc1)
+ordered2 <- pcld %>% arrange(-abs_pc2)
 
 pcs1 <- as.data.frame(pca$x)
 pcs1$code_combo <- as.integer(pca.train$`State and County FIPS Code`)

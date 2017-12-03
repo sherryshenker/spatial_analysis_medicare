@@ -4,10 +4,18 @@ setwd("~/spatial_analysis_medicare/code")
 
 source("load_medicare_data.R")
 
-contained_codes <-midwest_df$code_combo[which(!is.na(midwest_df$Standardized.Per.Capita.Costs))]
+contained_codes <-midwest_data$`State and County FIPS Code`
 countys@data$code_combo <-  paste0(countys@data$STATEFP,countys@data$COUNTYFP)
 
 midwest_spatial <- countys[which(countys$code_combo %in% contained_codes),]
+
+midwest_data$code_combo <- midwest_data$`State and County FIPS Code`
+midwest_spatial@data <- left_join(midwest_spatial@data,midwest_data,
+                                  by="code_combo")
+
+
+merged <- merge(fortify(midwest_spatial,region="code_combo"),midwest_data,
+                by.x="id",by.y="State and County FIPS Code")
 
 points <- coordinates(midwest_spatial)
 points_df <- as.data.frame(points)
@@ -19,7 +27,7 @@ costs <- (midwest_df[which(!is.na(midwest_df$Standardized.Per.Capita.Costs)),] %
 
 # ----- Correlogram for Global Spatial Autocorrelatoin -----------------
 
-c2 <- correlog(points_df$V1, points_df$V2, costs$cost, w = NULL, 1, resamp = 100, 
+c2 <- correlog(points_df$V1, points_df$V2, midwest_spatial@data$`Actual Per Capita Costs`, w = NULL, 1, resamp = 100, 
                latlon =TRUE, na.rm = TRUE, quiet = FALSE)
 
 df2 <- as.data.frame(cbind(c2$mean.of.class,c2$correlation))
@@ -92,7 +100,7 @@ plot_local_moran <- function(weights,var,alpha,title,correct=FALSE){
                       lmoran[, 5] <= alpha), "quad_sig"] <- "low-high"
   # non-significant observations
   county_med_spatial@data[(lmoran[, 5] > alpha), "quad_sig"] <- "not signif."  
-  
+  print(dim(county_med_spatial@data[which(county_med_spatial@data$quad_sig != "not signif."),]))
   county_med_spatial$quad_sig <- as.factor(county_med_spatial$quad_sig)
   county_med_spatial@data$id <- rownames(county_med_spatial@data)
   
@@ -104,7 +112,7 @@ plot_local_moran <- function(weights,var,alpha,title,correct=FALSE){
   map_plot <- (ggplot(pdata)
                 + geom_polygon(aes(x=long,y=lat,group=group,fill=quad_sig),color="black")
                 + ggtitle(title)
-                + scale_fill_manual(name="Cluster Type",values=c("red","pink","blue","lightblue","grey")))
+                + scale_fill_manual(name="Cluster Type",values=c("red","pink","lightblue","blue","grey")))
   plot <- format_plot(map_plot) 
   
   return(list("plot"=plot,"moran"=lmoran,"data"=pdata)) }
@@ -133,6 +141,16 @@ pca_queen_p05 <- plot_local_moran(q2,"PC1",0.05)
 pca_queen <- pca_queen_p05$plot
 ggsave("final/pca_queen.png",pca_queen)
 
+pca_queen_p05 <- plot_local_moran(knn2,"PC1",0.05,"First Principal Component (7NN Weights)")
+pca_queen <- pca_queen_p05$plot
+ggsave("final/pca_kn7_moran.png",pca_queen)
+
+pca_queen_p05 <- plot_local_moran(q2,"PC1",0.05,"First Principal Component (Queen Contiguity Weights)")
+pca_queen <- pca_queen_p05$plot
+ggsave("final/pca_q2_moran.png",pca_queen)
+
+hos_kn7_p10 <- plot_local_moran(knn2,"Average HCC Score",0.05,"Average HCC Score - Local Moran's I")
+ggsave("final/kn7_p05_hcc.png",hos_kn7_p10$plot)
 
 # ------- Local G --------------
 localGvalues <- localG(x = costs$cost, listw = knn2, zero.policy = TRUE)

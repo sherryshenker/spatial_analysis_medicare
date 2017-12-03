@@ -29,7 +29,8 @@ moran_I <- function(x, y = NULL, W){
 
 # Permutations for the Bivariate Moran's I
 simula_moran <- function(x, y = NULL, W, nsims = 2000){
-  
+  xp <- scale(x)[, 1]
+  yp <- scale(y)[, 1]
   if(is.null(y)) y = x
   
   n   = nrow(W)
@@ -47,8 +48,8 @@ simula_moran <- function(x, y = NULL, W, nsims = 2000){
   y_s = matrix(y_s, nrow = n, ncol = nsims)
   y_s <- (y_s - apply(y_s, 1, mean))/apply(y_s, 1, sd)
   
-  print(length(xp))
-  print(dim(W))
+  #print(length(xp))
+  #print(dim(W))
   
   global_sims  <- as.numeric( (xp%*%W%*%y_s)/(n - 1) )
  
@@ -77,7 +78,7 @@ W[which(is.na(W))] <- 0
 # Calculating the index and its simulated distribution
 # for global and local values
 
-m <- moran_I(costs$cost, costs$rate, W)
+m <- moran_I(midwest_spatial@data$`Actual Per Capita Costs`, midwest_spatial@data$`Average HCC Score`, W)
 
 # Global Moral
 global_moran <- m[[1]][1]
@@ -87,12 +88,12 @@ global_moran <- m[[1]][1]
 m_i <- m[[2]] 
 
 # local simulations
-local_sims <- simula_moran(costs$cost, costs$rate, W)$local_sims
+local_sims <- simula_moran(midwest_spatial@data$`Actual Per Capita Costs`, midwest_spatial@data$`Average HCC Score`, W)$local_sims
 
 
 # global pseudo p-value  
 # get all simulated global moran
-global_sims <- simula_moran(costs$cost, costs$rate, W)$global_sims
+global_sims <- simula_moran(midwest_spatial@data$`Actual Per Capita Costs`, midwest_spatial@data$`Average HCC Score`, W)$global_sims
 
 # Proportion of simulated global values taht are higher (in absolute terms) than the actual index 
 moran_pvalue <- sum(abs(global_sims) > abs( global_moran )) / length(global_sims)
@@ -114,8 +115,8 @@ midwest_spatial@data$sig <- sig
 
 
 # Identifying the LISA clusters
-xp <- scale(costs$cost)[,1]
-yp <- scale(costs$rate)[,1]
+xp <- scale(midwest_spatial@data$`Actual Per Capita Costs`)[,1]
+yp <- scale(midwest_spatial@data$`Average HCC Score`)[,1]
 
 
 patterns <- as.character( interaction(xp > 0, W%*%yp > 0) )
@@ -129,9 +130,10 @@ midwest_spatial@data$patterns <- patterns
 
 # Rename LISA clusters
 midwest_spatial@data$patterns2 <- factor(midwest_spatial@data$patterns, levels=c("High.High", "High.Low", "Low.High", "Low.Low", "Not significant"),
-                           labels=c("High cost - High readmit rate", "High cost - Low readmit rate", "Low cost - High readmit rate","Low cost - Low readmit rate", "Not significant"))
+                           labels=c("High cost - High HCC Score", "High cost - Low HCC Score", "Low cost - High HCC Score","Low cost - Low HCC Score", "Not significant"))
 
 
+midwest_spatial@data$id <- seq(from=1,to=nrow(midwest_spatial@data),by=1)
 
 final <- fortify(midwest_spatial,region="id")
 final$id <- as.numeric(final$id)
@@ -139,7 +141,7 @@ final2 <- left_join(final,midwest_spatial@data,by="id")
 ### PLOT
 
 bivariate <- (ggplot() +
-  geom_polygon(data=final2, aes(x=long,y=lat,group=group,fill=patterns2), color="NA") +
+  geom_polygon(data=final2, aes(x=long,y=lat,group=group,fill=patterns2), color="black") +
   scale_fill_manual(values = c("red", "pink", "light blue", "dark blue", "grey80")) + 
   guides(fill = guide_legend(title="LISA clusters")) +
   theme_bw() + ggtitle("Bivariate Moran's I")
@@ -156,4 +158,4 @@ bivariate <- (ggplot() +
           axis.title.y = element_blank())
   + coord_fixed())
 setwd("~/spatial_analysis_medicare")
-ggsave("images/bivariate_morans.png",bivariate)
+ggsave("bivariate_morans_final.png",bivariate)
